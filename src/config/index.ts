@@ -1,8 +1,9 @@
 export default () => ({
-  privateKeys: parseStringArray(process.env.PRIVATE_KEYS || ''),
+  privateKey: process.env.PRIVATE_KEY || '',
   apiUrl: process.env.API_URL || 'https://pump-fun-backend.fly.dev',
   rpcUrl: process.env.RPC_URL || 'https://api.harmony.one',
   creatorAddresses: parseStringArray(process.env.CREATOR_ADDRESSES || ''),
+  tokenFactoryAddress: process.env.TOKEN_FACTORY_ADDRESS || '',
   tradingInterval: process.env.TRADING_INTERVAL || '60',
 });
 
