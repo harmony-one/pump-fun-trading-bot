@@ -4,8 +4,9 @@ import axios from 'axios';
 import { Contract, ContractAbi, Web3 } from 'web3';
 import { Token } from './types';
 import * as TokenFactoryABI from './abi/TokenFactory.json';
+import * as TokenABI from './abi/Token.json';
 import { PayableCallOptions } from 'web3-types';
-import { parseUnits } from 'ethers';
+import { formatUnits, parseUnits } from "ethers";
 const crypto = require('crypto');
 
 @Injectable()
@@ -59,10 +60,29 @@ export class AppService {
     return randomInt / 0xffffffff;
   }
 
+  private getRandomInRange(min: number, max: number) {
+    return Math.random() * (max - min) + min;
+  }
+
   private async executeTrade(token: Token) {
-    const randomNumber = this.getRandom();
-    const side = randomNumber < 1 ? 'buy' : 'sell';
-    const value = parseUnits('0.01', 18);
+    const timeStart = Date.now();
+    const maxTradeSize = this.configService.get<number>('maxTradeSize');
+    const tokenContract = new this.web3.eth.Contract(TokenABI, token.address);
+    const tokenBalance = await tokenContract.methods
+      .balanceOf(this.accountAddress)
+      .call<bigint>();
+
+    let side = 'buy';
+    let value = parseUnits(
+      this.getRandomInRange(maxTradeSize / 10, maxTradeSize).toString(),
+      18,
+    );
+    if (tokenBalance > 0n) {
+      if (this.getRandom() > 0.5) {
+        side = 'sell';
+        value = tokenBalance;
+      }
+    }
 
     const args = [token.address];
     if (side === 'sell') {
@@ -96,17 +116,25 @@ export class AppService {
       this.configService.get('privateKey'),
     );
 
-    return this.web3.eth.sendSignedTransaction(signPromise.rawTransaction);
+    const receipt = await this.web3.eth.sendSignedTransaction(
+      signPromise.rawTransaction,
+    );
+    const tradeTokenName = side === 'buy' ? 'ONE' : token.name;
+    this.logger.log(
+      `Trade completed [${side}]: paid amount=${formatUnits(value, 18)} ${tradeTokenName}, hash=${receipt.transactionHash}, token name=${token.name} (${token.symbol}), token address=${token.address}, time elapsed=${Date.now() - timeStart}ms`,
+    );
+
+    return receipt;
   }
 
   async tradingLoop() {
+    const tradingInterval = this.configService.get<number>('tradingInterval');
     const tokens = await this.getTokens();
     if (tokens.length > 0) {
-      const { transactionHash } = await this.executeTrade(tokens[0]);
-      console.log('transactionHash', transactionHash);
+      await this.executeTrade(tokens[0]);
     }
 
-    await this.sleep(5000);
+    await this.sleep(tradingInterval * 1000);
 
     return this.tradingLoop();
   }

@@ -4,8 +4,8 @@ export default () => ({
   rpcUrl: process.env.RPC_URL || 'https://api.harmony.one',
   tokenAddresses: parseStringArray(process.env.TOKEN_ADDRESSES || ''),
   tokenFactoryAddress: process.env.TOKEN_FACTORY_ADDRESS || '',
-  tradingInterval: process.env.TRADING_INTERVAL || '60',
-  maxTradeSize: process.env.MAX_TRADE_SIZE || '0.1',
+  tradingInterval: Number(process.env.TRADING_INTERVAL || '5'),
+  maxTradeSize: Number(process.env.MAX_TRADE_SIZE || '0.1'),
 });
 
 const parseStringArray = (value = '') => {
