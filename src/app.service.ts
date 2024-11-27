@@ -4,6 +4,9 @@ import axios from 'axios';
 import { Contract, ContractAbi, Web3 } from 'web3';
 import { Token } from './types';
 import * as TokenFactoryABI from './abi/TokenFactory.json';
+import { PayableCallOptions } from 'web3-types';
+import { parseUnits } from 'ethers';
+const crypto = require('crypto');
 
 @Injectable()
 export class AppService {
@@ -45,11 +48,65 @@ export class AppService {
     return data;
   }
 
+  private sleep(ms: number) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  private getRandom() {
+    const randomBuffer = crypto.randomBytes(4);
+    const randomInt = randomBuffer.readUInt32BE(0);
+    // Divide by the maximum unsigned 32-bit integer to get a float between 0 and 1
+    return randomInt / 0xffffffff;
+  }
+
+  private async executeTrade(token: Token) {
+    const randomNumber = this.getRandom();
+    const side = randomNumber < 1 ? 'buy' : 'sell';
+    const value = parseUnits('0.01', 18);
+
+    const args = [token.address];
+    if (side === 'sell') {
+      args.push(String(value));
+    }
+    const functionName = side === 'buy' ? 'buy' : 'sell';
+    const options: PayableCallOptions = {
+      from: this.accountAddress,
+    };
+    if (side === 'buy') {
+      options.value = String(value);
+    }
+    const gasFees = await this.tokenFactoryContract.methods[functionName](
+      ...args,
+    ).estimateGas(options);
+    const gasPrice = await this.web3.eth.getGasPrice();
+
+    const tx = {
+      from: this.accountAddress,
+      to: this.configService.get('tokenFactoryAddress'),
+      gas: gasFees,
+      gasPrice,
+      value: options.value,
+      data: this.tokenFactoryContract.methods[functionName](
+        ...args,
+      ).encodeABI(),
+    };
+
+    const signPromise = await this.web3.eth.accounts.signTransaction(
+      tx,
+      this.configService.get('privateKey'),
+    );
+
+    return this.web3.eth.sendSignedTransaction(signPromise.rawTransaction);
+  }
+
   async tradingLoop() {
     const tokens = await this.getTokens();
-    console.log('tokens', tokens);
+    if (tokens.length > 0) {
+      const { transactionHash } = await this.executeTrade(tokens[0]);
+      console.log('transactionHash', transactionHash);
+    }
 
-    await new Promise((resolve) => setTimeout(resolve, 5000));
+    await this.sleep(5000);
 
     return this.tradingLoop();
   }
