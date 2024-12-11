@@ -75,7 +75,7 @@ export class AppService {
     let side = 'buy';
     let value = parseUnits(
       this.getRandomInRange(maxTradeSize / 10, maxTradeSize).toString(),
-      18,
+      'ether',
     );
     if (tokenBalance > 0n) {
       if (this.getRandom() > 0.5) {
@@ -129,9 +129,10 @@ export class AppService {
 
   async tradingLoop() {
     const tradingInterval = this.configService.get<number>('tradingInterval');
-    const tokens = await this.getTokens();
-    if (tokens.length > 0) {
-      await this.executeTrade(tokens[0]);
+    const tokens = await this.getTokens({ limit: 3 });
+
+    for (const token of tokens) {
+      await this.executeTrade(token);
     }
 
     await this.sleep(tradingInterval * 1000);
