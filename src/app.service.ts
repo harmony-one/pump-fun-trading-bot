@@ -6,7 +6,8 @@ import { Token } from './types';
 import * as TokenFactoryABI from './abi/TokenFactory.json';
 import * as TokenABI from './abi/Token.json';
 import { PayableCallOptions } from 'web3-types';
-import { formatUnits, parseUnits } from "ethers";
+import { formatUnits, parseUnits } from 'ethers';
+// eslint-disable-next-line @typescript-eslint/no-var-requires
 const crypto = require('crypto');
 
 @Injectable()
@@ -74,7 +75,7 @@ export class AppService {
 
     let side = 'buy';
     let value = parseUnits(
-      this.getRandomInRange(maxTradeSize / 10, maxTradeSize).toString(),
+      this.getRandomInRange(maxTradeSize / 10, maxTradeSize).toFixed(6),
       'ether',
     );
     if (tokenBalance > 0n) {
@@ -129,7 +130,14 @@ export class AppService {
 
   async tradingLoop() {
     const tradingInterval = this.configService.get<number>('tradingInterval');
-    const tokens = await this.getTokens({ limit: 3 });
+    const tokenAddresses = this.configService.get<string[]>('tokenAddresses');
+
+    let tokens = await this.getTokens({ limit: 1000 });
+    tokens = tokens.filter((token: Token) =>
+      tokenAddresses.includes(token.address.toLowerCase()),
+    );
+
+    this.logger.log(`Trading tokens count: ${tokens.length}`);
 
     for (const token of tokens) {
       await this.executeTrade(token);
